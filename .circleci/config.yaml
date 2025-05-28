@@ -3,7 +3,7 @@ version: 2.1
 jobs:
   tmate-debug:
     docker:
-      - image: ubuntu:24.04  # Official Ubuntu 24.04 base image
+      - image: ubuntu:24.04  # Officinal Ubuntu 24.04 base image
     steps:
       - run:
           name: 🧱 Install base tools
