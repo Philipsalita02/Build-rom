@@ -1,76 +1,90 @@
 version: 2.1
 
 jobs:
-  build_rom:
+  build_kernel:
     docker:
       - image: ubuntu:24.04
+
     steps:
       - run:
-          name: Update + Install Dependencies
+          name: Update & Install Dependencies
           command: |
-            sudo apt update -y && sudo apt upgrade -y
+            sudo apt update && sudo apt upgrade -y
             sudo apt install -y \
-              nano bc bison ca-certificates curl flex gcc git libc6-dev libssl-dev \
-              openssl python-is-python3 ssh wget zip zstd make clang software-properties-common \
-              build-essential libarchive-tools gcc-aarch64-linux-gnu \
-              libffi-dev libncurses5-dev zlib1g zlib1g-dev libreadline-dev \
-              libbz2-dev libsqlite3-dev pigz python2 python3 cpio lld llvm \
-              g++-aarch64-linux-gnu libelf-dev neofetch ccache cmake file ninja-build \
-              python3-dev texinfo u-boot-tools xz-utils
-
-            neofetch
-
-      - run:
-          name: Clone toolchains and sources
-          command: |
-            git clone --depth=1 https://github.com/kdrag0n/proton-clang.git toolchains/proton-clang
-            git clone https://github.com/KernelSU-Next/KernelSU-Next.git
+              bc bison ca-certificates curl flex gcc git libc6-dev libssl-dev \
+              openssl python-is-python3 ssh wget zip zstd sudo make clang \
+              gcc-arm-linux-gnueabi software-properties-common build-essential \
+              libarchive-tools gcc-aarch64-linux-gnu libssl-dev libffi-dev \
+              libncurses5-dev zlib1g-dev libreadline-dev libbz2-dev \
+              libsqlite3-dev pigz python3 cpio lld llvm g++-aarch64-linux-gnu \
+              libelf-dev neofetch binutils-dev ccache cmake file ninja-build \
+              python3-dev texinfo u-boot-tools xz-utils libstdc++-11-dev \
+              tmate
 
       - run:
-          name: Export Build Environment
+          name: Checkout Kernel Source
           command: |
-            export PATH="$(pwd)/toolchains/proton-clang/bin:$PATH"
-            export PATH="$HOME/a/toolchains/atom-x-clang/bin:$PATH"
-            export PATH="$HOME/a/toolchains/clang21/bin:$PATH"
-
-            echo 'CONFIG_ENERGY_MODEL=y' >> kernel/arch/arm64/configs/earth_defconfig
-            echo 'CONFIG_SCHED_MC=y' >> kernel/arch/arm64/configs/earth_defconfig
-            echo 'CONFIG_SCHED_SMT=y' >> kernel/arch/arm64/configs/earth_defconfig
-            echo 'CONFIG_SCHED_TUNE=y' >> kernel/arch/arm64/configs/earth_defconfig
+            git clone --depth=1 -b ksu-new https://github.com/Jayzee-Zee/Bumi-Kernel-Tree-Zee kernel
 
       - run:
-          name: Defconfig Setup
+          name: Clone Neutron Clang 19
           command: |
-            make O=out ARCH=arm64 earth_defconfig
+            mkdir -p toolchains
+            git clone --depth=1 -b clang-19 https://gitlab.com/LeCmnGend/clang.git toolchains/proton-clang
 
       - run:
-          name: Kernel Build (Proton Clang)
+          name: Clone KernelSU-Next
           command: |
-            make -j$(nproc --all) O=out \
+            git clone --depth=1 https://github.com/KernelSU-Next/KernelSU-Next.git kernel/KernelSU-Next
+
+      - run:
+          name: Build Kernel
+          command: |
+            cd kernel
+            export PATH="$PWD/../toolchains/proton-clang/bin:$PATH"
+
+            mkdir -p out
+            make -j$(nproc) O=out ARCH=arm64 CONFIG_LTO_NONE=n CONFIG_LTO_CLANG=y earth_defconfig
+
+            make -j$(nproc) \
+              O=out \
               ARCH=arm64 \
               CC=clang \
               CROSS_COMPILE=aarch64-linux-gnu- \
+              CLANG_TRIPLE=aarch64-linux-gnu- \
+              LLVM=1 \
+              LLVM_IAS=1 \
               LTO=full \
-              LLVM=1
+              LD=ld.lld \
+              KCFLAGS="-O3 -ffast-math -march=armv8-a+crypto -mtune=cortex-a75" \
+              CFLAGS="-O3 -ffast-math -march=armv8-a+crypto -mtune=cortex-a75" \
+              CXXFLAGS="-O3 -ffast-math -march=armv8-a+crypto -mtune=cortex-a75"
 
       - run:
-          name: Start tmate session
+          name: Start tmate session (60 min debug window)
           command: |
-            sudo apt install -y tmate
-            echo "Launching tmate..."
+            echo "⏳ Launching tmate..."
             tmate -S /tmp/tmate.sock new-session -d
             tmate -S /tmp/tmate.sock wait tmate-ready
-            echo "SSH Terminal:"
+            echo "🔑 SSH session:"
             tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}'
-            echo "Web Terminal:"
+            echo "🌐 Web session:"
             tmate -S /tmp/tmate.sock display -p '#{tmate_web}'
+            echo "Waiting for SSH debug..."
+            sleep 3600
 
       - run:
-          name: Wait for SSH access (60 minutes max)
-          command: sleep 3600
+          name: Upload Kernel Image
+          command: |
+            mkdir -p artifacts
+            cp kernel/out/arch/arm64/boot/Image.gz artifacts/Image.gz
+
+      - store_artifacts:
+          path: artifacts
+          destination: kernel_image
 
 workflows:
   version: 2
-  build_and_debug:
+  kernel_build_and_debug:
     jobs:
-      - build_rom
+      - build_kernel
