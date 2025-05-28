@@ -1,36 +1,38 @@
 version: 2.1
 
 jobs:
-  build:
+  build_rom:
     docker:
       - image: ubuntu:24.04
     steps:
       - run:
-          name: 🧱 Install base tools
+          name: Install base tools
           command: |
             apt update
             DEBIAN_FRONTEND=noninteractive apt install -y \
-              tmate openssh-client curl git build-essential
+              tmate openssh-client git curl wget \
+              build-essential clang lld lz4 bc \
+              libncurses-dev flex bison zip unzip
 
       - run:
-          name: 🔗 Start tmate session
+          name: Start tmate session
           command: |
-            echo "🔧 Starting tmate..."
+            echo "Starting tmate session..."
             tmate -S /tmp/tmate.sock new-session -d
             tmate -S /tmp/tmate.sock wait tmate-ready
-            echo "🔗 SSH:"
+            echo "SSH Terminal:"
             tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}'
-            echo "🌐 Web:"
+            echo "Web Terminal:"
             tmate -S /tmp/tmate.sock display -p '#{tmate_web}'
 
       - run:
-          name: ⌛ 60-minute access window
+          name: Wait for SSH access (60 minutes)
           command: |
-            echo "⚠️ SSH session active. This job will auto-end in 60 minutes."
+            echo "Session active for 60 mins"
             sleep 3600
 
 workflows:
   version: 2
   build_and_debug:
     jobs:
-      - build
+      - build_rom
