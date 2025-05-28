@@ -18,8 +18,7 @@ jobs:
               libncurses5-dev zlib1g-dev libreadline-dev libbz2-dev \
               libsqlite3-dev pigz python3 cpio lld llvm g++-aarch64-linux-gnu \
               libelf-dev neofetch binutils-dev ccache cmake file ninja-build \
-              python3-dev texinfo u-boot-tools xz-utils libstdc++-11-dev \
-              tmate
+              python3-dev texinfo u-boot-tools xz-utils libstdc++-11-dev
 
       - run:
           name: Checkout Kernel Source
@@ -61,19 +60,6 @@ jobs:
               CXXFLAGS="-O3 -ffast-math -march=armv8-a+crypto -mtune=cortex-a75"
 
       - run:
-          name: Start tmate session (60 min debug window)
-          command: |
-            echo "⏳ Launching tmate..."
-            tmate -S /tmp/tmate.sock new-session -d
-            tmate -S /tmp/tmate.sock wait tmate-ready
-            echo "🔑 SSH session:"
-            tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}'
-            echo "🌐 Web session:"
-            tmate -S /tmp/tmate.sock display -p '#{tmate_web}'
-            echo "Waiting for SSH debug..."
-            sleep 3600
-
-      - run:
           name: Upload Kernel Image
           command: |
             mkdir -p artifacts
@@ -85,6 +71,6 @@ jobs:
 
 workflows:
   version: 2
-  kernel_build_and_debug:
+  build_and_debug:
     jobs:
       - build_kernel
