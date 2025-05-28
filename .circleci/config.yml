@@ -6,18 +6,58 @@ jobs:
       - image: ubuntu:24.04
     steps:
       - run:
-          name: Install base tools
+          name: Update + Install Dependencies
           command: |
-            apt update
-            DEBIAN_FRONTEND=noninteractive apt install -y \
-              tmate openssh-client git curl wget \
-              build-essential clang lld lz4 bc \
-              libncurses-dev flex bison zip unzip
+            sudo apt update -y && sudo apt upgrade -y
+            sudo apt install -y \
+              nano bc bison ca-certificates curl flex gcc git libc6-dev libssl-dev \
+              openssl python-is-python3 ssh wget zip zstd make clang software-properties-common \
+              build-essential libarchive-tools gcc-aarch64-linux-gnu \
+              libffi-dev libncurses5-dev zlib1g zlib1g-dev libreadline-dev \
+              libbz2-dev libsqlite3-dev pigz python2 python3 cpio lld llvm \
+              g++-aarch64-linux-gnu libelf-dev neofetch ccache cmake file ninja-build \
+              python3-dev texinfo u-boot-tools xz-utils
+
+            neofetch
+
+      - run:
+          name: Clone toolchains and sources
+          command: |
+            git clone --depth=1 https://github.com/kdrag0n/proton-clang.git toolchains/proton-clang
+            git clone https://github.com/KernelSU-Next/KernelSU-Next.git
+
+      - run:
+          name: Export Build Environment
+          command: |
+            export PATH="$(pwd)/toolchains/proton-clang/bin:$PATH"
+            export PATH="$HOME/a/toolchains/atom-x-clang/bin:$PATH"
+            export PATH="$HOME/a/toolchains/clang21/bin:$PATH"
+
+            echo 'CONFIG_ENERGY_MODEL=y' >> kernel/arch/arm64/configs/earth_defconfig
+            echo 'CONFIG_SCHED_MC=y' >> kernel/arch/arm64/configs/earth_defconfig
+            echo 'CONFIG_SCHED_SMT=y' >> kernel/arch/arm64/configs/earth_defconfig
+            echo 'CONFIG_SCHED_TUNE=y' >> kernel/arch/arm64/configs/earth_defconfig
+
+      - run:
+          name: Defconfig Setup
+          command: |
+            make O=out ARCH=arm64 earth_defconfig
+
+      - run:
+          name: Kernel Build (Proton Clang)
+          command: |
+            make -j$(nproc --all) O=out \
+              ARCH=arm64 \
+              CC=clang \
+              CROSS_COMPILE=aarch64-linux-gnu- \
+              LTO=full \
+              LLVM=1
 
       - run:
           name: Start tmate session
           command: |
-            echo "Starting tmate session..."
+            sudo apt install -y tmate
+            echo "Launching tmate..."
             tmate -S /tmp/tmate.sock new-session -d
             tmate -S /tmp/tmate.sock wait tmate-ready
             echo "SSH Terminal:"
@@ -26,10 +66,8 @@ jobs:
             tmate -S /tmp/tmate.sock display -p '#{tmate_web}'
 
       - run:
-          name: Wait for SSH access (60 minutes)
-          command: |
-            echo "Session active for 60 mins"
-            sleep 3600
+          name: Wait for SSH access (60 minutes max)
+          command: sleep 3600
 
 workflows:
   version: 2
