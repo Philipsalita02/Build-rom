@@ -1,0 +1,36 @@
+version: 2.1
+
+jobs:
+  tmate-debug:
+    docker:
+      - image: ubuntu:24.04  # Official Ubuntu 24.04 base image
+    steps:
+      - run:
+          name: 🧱 Install base tools
+          command: |
+            apt update
+            DEBIAN_FRONTEND=noninteractive apt install -y \
+              tmate openssh-client git curl wget \
+              build-essential clang lld lz4 bc \
+              libncurses-dev flex bison zip unzip
+
+      - run:
+          name: 🔗 Start tmate session
+          command: |
+            echo "🔥 Starting tmate session..."
+            tmate -S /tmp/tmate.sock new-session -d
+            tmate -S /tmp/tmate.sock wait tmate-ready
+            echo "✅ SSH Terminal:"
+            tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}'
+            echo "🌐 Web Terminal:"
+            tmate -S /tmp/tmate.sock display -p '#{tmate_web}'
+
+      - run:
+          name: ⌛ Wait for user to connect
+          command: tail -f /dev/null
+
+workflows:
+  version: 2
+  debug:
+    jobs:
+      - tmate-debug
